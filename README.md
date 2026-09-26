@@ -1,10 +1,10 @@
-# Apollo + JEV lead classifier
+# Apollo + JEV lead qualification and messaging
 
-Turn saved Apollo contacts or a CSV export into a list you can review by customer fit, relevant offer and message mismatch.
+Turn saved Apollo contacts or a CSV export into qualified leads and personalized message drafts with a call invitation.
 
-This starter uses JEV for structured decisions. You define what a good customer looks like, import from Apollo and get the model's labels and confidence for each prospect. Uncertain records go into a review queue.
+This starter uses JEV for structured decisions. You define what a good customer looks like, import from Apollo and get the model's labels and confidence for each prospect. Uncertain records go into a review queue. With `--draft-messages`, confident fits get a company-specific draft for the selected service, then JEV checks the draft against the supplied evidence.
 
-**Status:** direct Apollo saved-contact integration and JEV classification are implemented and tested offline. A live Apollo-to-JEV run, speed, cost and accuracy still need verification with your accounts. The sample data is fictional.
+**Status:** direct Apollo saved-contact import, JEV classification and template-based messaging are implemented and tested offline. A live Apollo-to-JEV run, speed, cost and accuracy still need verification with your accounts. The sample data is fictional.
 
 Start with the [plain-English walkthrough](docs/resource.md).
 
@@ -19,10 +19,10 @@ python3 configure.py
 python3 lead_classifier.py --doctor
 ```
 
-Once your offer and keys are configured, this imports up to 10 saved contacts and classifies them:
+Once your offer, message templates and keys are configured, this imports up to 10 saved contacts, classifies them and prepares checked drafts for confident fits:
 
 ```sh
-python3 lead_classifier.py --source apollo --live --limit 10 --output output-first-live
+python3 lead_classifier.py --source apollo --live --draft-messages --limit 10 --output output-first-live
 ```
 
 Use `--preview` instead of `--live` to fetch Apollo contacts and inspect the JEV requests first. Apollo preview contacts Apollo but makes no JEV calls. The guide covers list filters, optional company enrichment and adding research or messages. Python 3.10+ is the only local dependency. On Windows use `py` instead of `python3`.
@@ -39,7 +39,38 @@ Use `--preview` instead of `--live` to fetch Apollo contacts and inspect the JEV
 
 The included example targets service-business owners and operations buyers. Edit `config/offer.json` to use a different offer. The suggested confidence threshold of 0.8 is a starting rule, not a validated accuracy target.
 
-The tool does not predict conversion rates, write messages, fetch web pages, reveal personal contact details or send outreach. It can optionally enrich company data through Apollo. An `unknown` is useful when a record lacks a fact needed for a decision.
+Drafts use editable templates personalized by company and the evidence-supported service angle. JEV selects and checks; it does not generate free-form prose. The tool does not predict conversion rates, fetch web pages, reveal personal contact details, send outreach or book calls automatically. It can optionally enrich company data through Apollo. An `unknown` is useful when a record lacks a fact needed for a decision.
+
+## Turn qualified leads into message drafts
+
+Edit `config/messages.json` alongside your offer:
+
+- `templates`: one subject and body for each service angle in `config/offer.json`, excluding `unknown`. Use `{company}` and optionally `{title}`. Write only what your business actually offers.
+- `call_to_action`: your invitation to talk. The default asks whether a quick call would be useful.
+- `booking_url`: optionally add your own HTTPS booking link. Blank means no link is included.
+- `sender_name`: optionally add your signature.
+
+Then add `--draft-messages` to your live command. For an existing CSV:
+
+```sh
+python3 lead_classifier.py --input data/apollo.csv --live --draft-messages --limit 10 --output output-with-messages
+```
+
+The tool drafts only when fit is `good_fit`, the selected angle is known, both confidence values meet your threshold and a company name is present. It can draft a replacement for an existing mismatched message while preserving the original message and classification. It does not rank by reply probability or manufacture a personal observation from research notes.
+
+Open `message_drafts.csv`. It contains a subject, message, original message, evidence references, a separate JEV message check and a status for every input row:
+
+| Status | Meaning |
+| --- | --- |
+| `review_before_sending` | JEV returned a confident match. You still review and send through your normal process. |
+| `revise_message` | JEV flagged a mismatch in the generated subject or body. |
+| `research_or_review` | The draft check was unknown or below your threshold. |
+| `error_review` | The draft check failed. The draft stays available, but is not cleared for outreach review. |
+| `skipped_*` | No draft: poor fit, uncertain fit/angle, missing company or failed classification. |
+
+Each draft adds one JEV request, including the subject, full message and booking link if supplied. Draft checks run sequentially after classification and use API credits. The summary records their usage separately. Preview mode validates the templates but produces no drafts because it has no JEV fit results. No additional writing-provider key is required.
+
+See an [illustrative message](examples/message-draft.md) and the [messaging walkthrough](docs/messaging.md). Booked calls depend on actual sending and prospect responses; they are not an output of this tool.
 
 ## Try it without an API key
 
@@ -112,7 +143,7 @@ Remove-Item Env:TYPESAFE_API_KEY
 
 Alternatively, run `python3 configure.py` to save both keys privately in the ignored `.env` file. The classifier loads that file automatically; nonempty environment variables take precedence. Clearing an environment variable does not remove a saved key from `.env`.
 
-For a larger run, set `--limit 700` or another explicit cap. The default is 10 rows and four concurrent requests. Set `--workers 1` for serial requests, or up to 16 after checking your rate limits. Each lead uses one request containing its applicable questions. There is no dollar spending cap and retries may add charges.
+For a larger run, set `--limit 700` or another explicit cap. The default is 10 rows and four concurrent requests. Set `--workers 1` for serial requests, or up to 16 after checking your rate limits. Each lead uses one classification request containing its applicable questions. `--draft-messages` adds one request per generated draft. There is no dollar spending cap and retries may add charges.
 
 ## Read your results
 
@@ -125,6 +156,7 @@ Other output files:
 - `config-used.json`: a snapshot of your criteria.
 - `summary.json`: row counts, elapsed processing time, returned model IDs and reported usage. Cost remains blank until checked against provider billing.
 - `source-summary.json`: import source, time and Apollo completeness information.
+- With `--draft-messages`: `message_drafts.csv`, `message-requests.jsonl`, `message-responses.jsonl` and `messages-config-used.json`. Draft checks, errors and usage appear under `messaging` in `summary.json`; classification and draft-check usage must both be included when calculating total cost.
 - In Apollo mode, `imported-leads.csv` and `apollo-config-used.json`: the selected business fields and search settings. Reuse the CSV to classify the same snapshot without fetching or enriching again.
 
 Use the [benchmark worksheet](docs/validation.md) before publishing performance claims. Classification confidence is not the probability that someone replies or buys. TypeSafe explains the distinction in its [confidence guide](https://docs.typesafe.ai/confidence).

@@ -38,3 +38,9 @@ An offline test with a simulated response verifies the software's handling of th
 Fit labels alone do not measure response or conversion probability. To investigate campaign performance, record actual replies and qualified outcomes. Compare sufficiently similar groups and keep message, audience and sending conditions documented. A small or selected sample does not establish that JEV caused a lift.
 
 Publish anonymized or fictional examples. Keep real prospect files, keys and private outreach out of the public repository.
+
+## Messaging validation
+
+With `--draft-messages`, record drafts created, skipped leads, confident matches, held drafts and failed checks. Manually inspect the exact subject, body, service claims and booking link. Track actual sends, replies and booked calls separately. A JEV match is not human approval or a forecast of responses.
+
+Classification usage and `messaging.reported_usage` are separate in `summary.json`; include both and any failed/retried requests in billing reconciliation. Draft checks run after classification, so classification-only timing cannot represent the complete workflow.

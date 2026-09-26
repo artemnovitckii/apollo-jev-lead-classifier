@@ -1,10 +1,10 @@
 # Clone it and let your AI help set it up
 
-Give your coding assistant this repository and the prompt below. It contains the Apollo importer, JEV classifier, editable criteria, key setup and checks. You supply your own accounts and tell it what a good prospect looks like.
+Give your coding assistant this repository and the prompt below. It contains the Apollo importer, JEV classifier, editable criteria, message templates, key setup and checks. You supply your own accounts and tell it what a good prospect looks like.
 
 ## Copy this prompt
 
-> Set up this Apollo + JEV lead classifier for me. Read AGENTS.md and docs/setup-with-ai.md. Ask about my offer, target buyer, exclusions and the services I want to match to prospects, then configure the criteria. Help me connect either my saved Apollo contacts or an Apollo CSV. Show me how to enter my API keys privately with configure.py, and never ask me to paste keys into this conversation. Run the local checks, then import a preview of 10 contacts once Apollo is configured. Tell me which fields are missing and whether company enrichment would help. I want the setup ready to classify my list with JEV. Clearly distinguish offline checks from a successful live run.
+> Set up this Apollo + JEV lead classifier for me. Read AGENTS.md and docs/setup-with-ai.md. Ask about my offer, target buyer, exclusions and the services I want to match to prospects, then configure the criteria and message templates. Ask for my call invitation, optional booking URL and sender name. Update config/messages.json with one truthful template per service angle. Help me connect either my saved Apollo contacts or an Apollo CSV. Show me how to enter my API keys privately with configure.py, and never ask me to paste keys into this conversation. Run the local checks, then import a preview of 10 contacts once Apollo is configured. Tell me which fields are missing and whether company enrichment would help. I want the setup ready to qualify my list and create personalized message drafts with --draft-messages. Explain which drafts need revision or research and which are ready for my review before sending. Do not send messages. Clearly distinguish offline checks from a successful live run.
 
 ## What you need
 
@@ -38,16 +38,18 @@ This calls Apollo. It makes no JEV calls. Inspect `imported-leads.csv`, `source-
 If the imported records have enough context, classify that exact saved snapshot without fetching Apollo again:
 
 ```sh
-python3 lead_classifier.py --input output-apollo-preview/imported-leads.csv --live --limit 10 --output output-first-results
+python3 lead_classifier.py --input output-apollo-preview/imported-leads.csv --live --draft-messages --limit 10 --output output-first-results
 ```
 
 Or fetch and classify in one command:
 
 ```sh
-python3 lead_classifier.py --source apollo --live --limit 10 --output output-direct-results
+python3 lead_classifier.py --source apollo --live --draft-messages --limit 10 --output output-direct-results
 ```
 
-Live mode uses JEV API credits. Increase the row limit only when ready. Use a new output folder for every run.
+Open message_drafts.csv alongside classified.csv. Confident fits with a supported service get a company-specific template draft, call invitation and optional booking link, followed by a separate JEV check. Review the status before using any message. See [messaging setup](messaging.md).
+
+Live mode uses JEV API credits. Each generated draft adds a JEV check. Increase the row limit only when ready. Use a new output folder for every run.
 
 ## Choose the saved contacts
 
@@ -94,4 +96,4 @@ Apollo 401 usually means the key is invalid or absent. Apollo 403 can mean the e
 
 If Apollo returns no contacts, confirm they are saved in the account that owns the key and check your filters. If enrichment fails, retry without the enrichment flag or use a CSV that already contains the company data you need.
 
-The integration has offline tests using simulated HTTP responses. A real Apollo-to-JEV run still needs verification with your accounts. Account creation, enrichment, web research, message writing and sending are separate from this classifier's setup.
+The integration has offline tests using simulated HTTP responses. A real Apollo-to-JEV run still needs verification with your accounts. Template drafting and JEV message checks are included with --draft-messages. Account creation, optional enrichment and web research need their own setup; sending and booking calls happen through your existing process.

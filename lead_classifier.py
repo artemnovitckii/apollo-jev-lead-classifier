@@ -14,6 +14,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 import apollo
+import messaging
 from local_settings import load_env
 
 ENDPOINT = "https://api.typesafe.ai/v1/systemone"
@@ -182,6 +183,8 @@ def main():
     parser.add_argument("--limit", type=int, default=10, help="Maximum rows, default 10")
     parser.add_argument("--workers", type=int, default=4, help="Concurrent JEV requests, 1 to 16")
     parser.add_argument("--model", default="jev-latest")
+    parser.add_argument("--draft-messages", action="store_true", help="Draft messages for confident fits and check each with JEV; never sends outreach")
+    parser.add_argument("--messages-config", default=str(ROOT / "config/messages.json"))
     modes = parser.add_mutually_exclusive_group(required=True)
     modes.add_argument("--preview", action="store_true", help="Prepare requests without calling JEV")
     modes.add_argument("--live", action="store_true", help="Send selected fields to TypeSafe; uses API credits")
@@ -190,6 +193,7 @@ def main():
     if not 1 <= args.workers <= 16 or args.limit < 1:
         parser.error("Use workers 1 to 16 and a positive limit.")
     config = load_config(args.config)
+    message_config = messaging.load_config(args.messages_config, config) if args.draft_messages else None
     apollo_config = json.loads(Path(args.apollo_config).read_text())
     apollo.validate_config(apollo_config)
     if args.doctor:
@@ -222,6 +226,8 @@ def main():
     # Keep separate runs, and never overwrite a previous result or source file.
     out.mkdir(parents=True, exist_ok=False)
     (out / "config-used.json").write_text(json.dumps(config, indent=2) + "\n")
+    if message_config is not None:
+        (out / "messages-config-used.json").write_text(json.dumps(message_config, indent=2) + "\n")
     (out / "source-summary.json").write_text(json.dumps(source_meta, indent=2) + "\n")
     if args.source == "apollo":
         (out / "apollo-config-used.json").write_text(json.dumps(apollo_config, indent=2) + "\n")
@@ -257,6 +263,23 @@ def main():
             writer = csv.DictWriter(f, fieldnames=list(results[0][0]))
             writer.writeheader()
             writer.writerows({k: csv_safe(v) for k, v in row.items()} for row, _ in results)
+    draft_rows, draft_responses = [], []
+    if args.live and message_config is not None:
+        with (out / "message-requests.jsonl").open("w") as requests_file, (out / "message-responses.jsonl").open("w") as responses_file:
+            for lead, (classification, _) in zip(leads, results):
+                row = messaging.prepare(lead, classification, message_config, config["review_threshold"])
+                if row["status"] == "pending_check":
+                    body, response = messaging.check(row, lead, config, args.model, key, request_body, post_jev, validate_answers)
+                    requests_file.write(json.dumps({"lead_id": lead["lead_id"], "request": body}) + "\n")
+                    responses_file.write(json.dumps({"lead_id": lead["lead_id"], "response": response, "error": row["error"]}) + "\n")
+                    requests_file.flush()
+                    responses_file.flush()
+                    draft_responses.append(response)
+                draft_rows.append(row)
+        with (out / "message_drafts.csv").open("w", newline="", encoding="utf-8-sig") as f:
+            writer = csv.DictWriter(f, fieldnames=list(draft_rows[0]))
+            writer.writeheader()
+            writer.writerows({k: csv_safe(v) for k, v in row.items()} for row in draft_rows)
     summary = {
         "mode": "live" if args.live else ("apollo_preview_no_jev_calls" if args.source == "apollo" else "preview_no_api_calls"),
         "source": source_meta,
@@ -270,10 +293,24 @@ def main():
         "reported_usage": [r["usage"] for _, r in results if "usage" in r],
         "cost_usd": None,
         "cost_note": "Check provider billing. No price or cost is assumed; failed attempts may be billed.",
+        "messaging": {
+            "requested": args.draft_messages,
+            "method": "company_and_service_templates_checked_by_jev",
+            "drafts_created": sum(bool(r["message"]) for r in draft_rows),
+            "checks_attempted": len(draft_responses),
+            "review_before_sending": sum(r["status"] == "review_before_sending" for r in draft_rows),
+            "held_for_revision_or_research": sum(r["status"] in ("revise_message", "research_or_review") for r in draft_rows),
+            "skipped_rows": sum(r["status"].startswith("skipped_") for r in draft_rows),
+            "failed_checks": sum(bool(r["error"]) for r in draft_rows),
+            "reported_usage": [r["usage"] for r in draft_responses if "usage" in r],
+            "models_returned": sorted({str(r["model"]) for r in draft_responses if "model" in r}),
+            "messages_config_sha256": hashlib.sha256(json.dumps(message_config, sort_keys=True).encode()).hexdigest() if message_config else None,
+            "note": "Preview produces no drafts because eligibility needs JEV results. Each live draft adds a JEV check. No messages are sent.",
+        },
     }
     (out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     print(f"{summary['mode']}: {len(leads)} rows; files in {out.resolve()}")
-    return 1 if summary["failed_rows"] else 0
+    return 1 if summary["failed_rows"] or summary["messaging"]["failed_checks"] else 0
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # Which Apollo leads actually fit your offer?
 
-A practical guide to classifying your lead list with JEV.
+A practical guide to qualifying your lead list and preparing personalized outreach with JEV.
 
 An Apollo search gives you people who match your filters. You still need to decide whether your offer makes sense for them and whether your message says anything unsupported.
 
@@ -77,7 +77,15 @@ You can filter the CSV by service to review one group together. Keep the origina
 
 For example, a reporting offer may make sense for a prospect whose supplied brief describes manual client reports. A warehouse-inventory pitch to that same prospect would deserve a mismatch flag. These are illustrations of the criteria, not measured model results.
 
-## 6. Measure it on your own list
+## 6. Draft a message for each qualified lead
+
+Configure `config/messages.json` with your real services, call invitation, optional booking link and signature. Add `--draft-messages` to the live command. JEV selects the service angle; the code fills a company-specific template and JEV checks the resulting subject and message.
+
+Open `message_drafts.csv`. Confident good fits with a known angle get a draft. Poor fits and uncertain records are skipped. A confident message match is marked `review_before_sending`; mismatches, uncertainty and API errors remain flagged. Original messages and classifications stay available.
+
+The [messaging guide](messaging.md) shows the command, settings, example and review steps. This is template personalization by company and service, not free-form writing or automatic sending. A booking link is an invitation, not a booked meeting.
+
+## 7. Measure it on your own list
 
 Once the small batch looks sensible, test a larger list against decisions you have reviewed manually. Track errors and unknowns as well as speed.
 

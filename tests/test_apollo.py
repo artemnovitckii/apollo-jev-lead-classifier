@@ -124,12 +124,15 @@ class ApolloTests(unittest.TestCase):
     def test_full_pipeline_with_simulated_providers(self):
         with tempfile.TemporaryDirectory() as folder:
             out = Path(folder) / "simulated-run"
-            args = ["lead_classifier.py", "--source", "apollo", "--live", "--limit", "1", "--output", str(out)]
+            args = ["lead_classifier.py", "--source", "apollo", "--live", "--draft-messages", "--limit", "1", "--output", str(out)]
             with patch("sys.argv", args), patch.object(app, "load_env"), patch.dict(os.environ, {"APOLLO_API_KEY": "test", "TYPESAFE_API_KEY": "test"}), patch.object(apollo, "api_request", return_value={"contacts": [contact(1)]}), patch.object(app, "post_jev", side_effect=lambda body, key: response_for(body)):
                 self.assertEqual(app.main(), 0)
             summary = json.loads((out / "summary.json").read_text())
             self.assertEqual(summary["successful_rows"], 1)
             self.assertEqual(summary["source"]["source"], "apollo_saved_contacts")
+            self.assertEqual(summary["messaging"]["drafts_created"], 1)
+            self.assertEqual(summary["messaging"]["review_before_sending"], 1)
+            self.assertTrue((out / "message_drafts.csv").exists())
 
     def test_existing_output_blocks_calls(self):
         with tempfile.TemporaryDirectory() as folder:

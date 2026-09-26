@@ -1,0 +1,19 @@
+{
+  "sender_name": "",
+  "booking_url": "",
+  "call_to_action": "Would you be open to a quick call to see whether this would be useful?",
+  "templates": {
+    "enquiry_follow_up": {
+      "subject": "Enquiry follow-up at {company}",
+      "body": "Hi, I wanted to ask about enquiry follow-up at {company}. We build workflows that route new enquiries, flag unanswered ones and prepare follow-ups for your team to review. Is that something you are looking to improve?"
+    },
+    "client_onboarding": {
+      "subject": "Client onboarding at {company}",
+      "body": "Hi, I wanted to ask about client onboarding at {company}. We build workflows that collect intake forms, track missing files and show your team what is still needed. Would that be relevant to how you onboard clients?"
+    },
+    "reporting": {
+      "subject": "Client reporting at {company}",
+      "body": "Hi, I wanted to ask about reporting at {company}. We build workflows that bring reporting inputs together and prepare a draft for your team to check. Would it be useful to explore this for your client reports?"
+    }
+  }
+}
