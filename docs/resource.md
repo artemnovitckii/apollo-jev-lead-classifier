@@ -4,7 +4,9 @@ A practical guide to classifying your lead list with JEV.
 
 An Apollo search gives you people who match your filters. You still need to decide whether your offer makes sense for them and whether your message says anything unsupported.
 
-This project adds those checks to an exported list. You write down your criteria, give JEV the available evidence and get a CSV with a decision for each prospect. The useful part is being able to review a whole list using the same criteria.
+This project adds those checks to saved Apollo contacts or an exported list. You write down your criteria, give JEV the available evidence and get a CSV with a decision for each prospect. The useful part is being able to review a whole list using the same criteria.
+
+If you want an AI to handle setup, start with the [clone-and-configure guide](setup-with-ai.md). It includes a prompt you can paste into your coding assistant and instructions for connecting Apollo directly. The CSV route below works too.
 
 ## The example
 
@@ -42,7 +44,7 @@ Save the file in this project's `data` folder. Include company name, job title a
 
 If you already researched a prospect, add the evidence in `Research Notes`, with its source and date in `Research Source` and `Research Date`. Add an existing message under `Outreach Message` to check it too.
 
-These research columns are additions you supply. The starter does not automatically research prospects or visit source links.
+These research columns are additions you supply. The starter does not automatically research operational pain points or visit source links. Direct API import can optionally enrich company facts such as industry and headcount; those facts alone do not prove a specific need.
 
 ## 3. Look at what JEV would receive
 

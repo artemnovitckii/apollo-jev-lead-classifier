@@ -1,12 +1,31 @@
 # Apollo + JEV lead classifier
 
-Turn an Apollo export into a list you can review by customer fit, relevant offer and message mismatch.
+Turn saved Apollo contacts or a CSV export into a list you can review by customer fit, relevant offer and message mismatch.
 
-This starter uses JEV for structured decisions. You define what a good customer looks like, import an Apollo CSV and get the model's labels and confidence for each prospect. Uncertain records go into a review queue.
+This starter uses JEV for structured decisions. You define what a good customer looks like, import from Apollo and get the model's labels and confidence for each prospect. Uncertain records go into a review queue.
 
-**Status:** starter implementation. Offline tests and request preview are available. Live JEV classification, speed, cost and accuracy still need verification with your account. The sample data is fictional.
+**Status:** direct Apollo saved-contact integration and JEV classification are implemented and tested offline. A live Apollo-to-JEV run, speed, cost and accuracy still need verification with your accounts. The sample data is fictional.
 
 Start with the [plain-English walkthrough](docs/resource.md).
+
+## Set it up with your AI
+
+Clone this repository, open it in your coding assistant and give it the [setup prompt](docs/setup-with-ai.md). `AGENTS.md` tells the assistant how to configure your offer, connect Apollo and check the results. You supply your own account keys privately:
+
+```sh
+git clone https://github.com/artemnovitckii/apollo-jev-lead-classifier.git
+cd apollo-jev-lead-classifier
+python3 configure.py
+python3 lead_classifier.py --doctor
+```
+
+Once your offer and keys are configured, this imports up to 10 saved contacts and classifies them:
+
+```sh
+python3 lead_classifier.py --source apollo --live --limit 10 --output output-first-live
+```
+
+Use `--preview` instead of `--live` to fetch Apollo contacts and inspect the JEV requests first. Apollo preview contacts Apollo but makes no JEV calls. The guide covers list filters, optional company enrichment and adding research or messages. Python 3.10+ is the only local dependency. On Windows use `py` instead of `python3`.
 
 ## What you get
 
@@ -20,7 +39,7 @@ Start with the [plain-English walkthrough](docs/resource.md).
 
 The included example targets service-business owners and operations buyers. Edit `config/offer.json` to use a different offer. The suggested confidence threshold of 0.8 is a starting rule, not a validated accuracy target.
 
-The tool does not predict conversion rates, write messages, fetch web pages, enrich contacts or send outreach. It works with the evidence you supply. An `unknown` is useful when the export lacks a fact needed for a decision.
+The tool does not predict conversion rates, write messages, fetch web pages, reveal personal contact details or send outreach. It can optionally enrich company data through Apollo. An `unknown` is useful when a record lacks a fact needed for a decision.
 
 ## Try it without an API key
 
@@ -38,7 +57,7 @@ Open `output-preview/requests.jsonl`. It shows exactly which selected fields wou
 
 Each run requires a new output directory so it cannot overwrite a previous run.
 
-## Connect your Apollo data
+## Use an Apollo CSV instead
 
 1. In Apollo, open **Search > People**, filter to your list and select the contacts.
 2. Choose **Export** and check the CSV field settings. Include company name, title, industry, employee count and useful keywords or company information when available.
@@ -54,7 +73,7 @@ Apollo's export permissions and credit usage depend on your account. Field avail
 
 Headers are case-insensitive. Accepted aliases are listed in `ALIASES` inside `lead_classifier.py`. Unknown columns are ignored. A company column is required; missing details stay blank. Rows with duplicate Apollo IDs stop the import. If IDs are absent, the tool assigns IDs from CSV row numbers, which are only stable within that file.
 
-This version connects through CSV. Direct Apollo API ingestion is not implemented. Apollo's [People API Search](https://docs.apollo.io/reference/people-api-search) is an option for a later integration, but it does not return email addresses or phone numbers. Search data also needs enough business context to support your criteria.
+For direct API import, follow the [Apollo setup guide](docs/setup-with-ai.md). It reads saved contacts through Apollo's Contacts Search endpoint. It does not search the entire Apollo prospect database.
 
 ## Make it fit your offer
 
@@ -91,7 +110,7 @@ py lead_classifier.py --input data/apollo.csv --live --limit 10 --output output-
 Remove-Item Env:TYPESAFE_API_KEY
 ```
 
-The included `.env.example` documents the variable name. The script does not load `.env` files.
+Alternatively, run `python3 configure.py` to save both keys privately in the ignored `.env` file. The classifier loads that file automatically; nonempty environment variables take precedence. Clearing an environment variable does not remove a saved key from `.env`.
 
 For a larger run, set `--limit 700` or another explicit cap. The default is 10 rows and four concurrent requests. Set `--workers 1` for serial requests, or up to 16 after checking your rate limits. Each lead uses one request containing its applicable questions. There is no dollar spending cap and retries may add charges.
 
@@ -105,12 +124,14 @@ Other output files:
 - `responses.jsonl`: returned responses or per-record errors.
 - `config-used.json`: a snapshot of your criteria.
 - `summary.json`: row counts, elapsed processing time, returned model IDs and reported usage. Cost remains blank until checked against provider billing.
+- `source-summary.json`: import source, time and Apollo completeness information.
+- In Apollo mode, `imported-leads.csv` and `apollo-config-used.json`: the selected business fields and search settings. Reuse the CSV to classify the same snapshot without fetching or enriching again.
 
 Use the [benchmark worksheet](docs/validation.md) before publishing performance claims. Classification confidence is not the probability that someone replies or buys. TypeSafe explains the distinction in its [confidence guide](https://docs.typesafe.ai/confidence).
 
 ## Data and keys
 
-Preview runs locally. Live mode sends company, role, business context, supplied research and message text to TypeSafe. Dedicated name, email, phone and personal profile columns are excluded, but anything you put inside notes or messages still goes to the provider.
+CSV preview runs locally. Apollo preview reads from Apollo; optional company enrichment can consume Apollo credits. Live mode also sends company, role, business context, supplied research and message text to TypeSafe. Dedicated name, email, phone and personal profile fields are excluded from saved imports and JEV payloads, but anything you put inside notes or messages still goes to the provider. Apollo's response may contain contact details in memory before the importer selects its business fields; it does not save the raw response.
 
 Input files in `data/`, output folders named `output*` and environment files are ignored by Git. Keep real prospect files there. Custom output paths outside `output*` are not automatically ignored. Requests and responses can contain sensitive business information; review files before sharing. Synthetic examples are the only lead data intended for the repository.
 
@@ -123,6 +144,7 @@ Input files in `data/`, output folders named `output*` and environment files are
 | Missing company column or extra cells | Check your export headers and CSV quoting. Do not hand-edit commas inside quoted text. |
 | Too many `unknown` results | Inspect missing fields or narrow the criteria. Add sourced facts instead of lowering the threshold to hide uncertainty. |
 | JEV HTTP 401 | Check that your TypeSafe key is active and set in the same terminal. |
+| Apollo HTTP 401 or 403 | Check your Apollo key and access to Contacts Search, plus Organization Enrichment if enabled. See the setup guide. |
 | JEV HTTP 422 | Inspect request structure and edited criteria. Reduce oversized notes. |
 | JEV HTTP 429 or 529 | The tool retries these responses with backoff, up to four attempts. Reduce `--workers` if it persists. |
 | Connection timeout | Check provider status and your connection. The request might have been billed; it is not automatically retried. |

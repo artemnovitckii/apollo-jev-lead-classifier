@@ -1,4 +1,4 @@
-"""Apollo CSV -> JEV decisions. Python 3.10+, standard library only."""
+"""Apollo API or CSV -> JEV decisions. Python 3.10+, standard library only."""
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 import csv
@@ -13,18 +13,22 @@ import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+import apollo
+from local_settings import load_env
+
 ENDPOINT = "https://api.typesafe.ai/v1/systemone"
 ROOT = Path(__file__).resolve().parent
 ALIASES = {
     "lead_id": ["apollo contact id", "apollo record id", "lead_id"],
     "title": ["title", "job title"],
     "company": ["company name", "company", "company name for emails"],
+    "company_domain": ["company_domain", "website", "company website"],
     "industry": ["industry"],
     "employees": ["# employees", "employees"],
     "description": ["short description", "company description", "description"],
     "keywords": ["keywords"],
     "technologies": ["technologies"],
-    "company_country": ["company country"],
+    "company_country": ["company country", "company_country"],
     "research_notes": ["research notes", "research_notes"],
     "research_source": ["research source", "research_source"],
     "research_date": ["research date", "research_date"],
@@ -167,8 +171,12 @@ def csv_safe(value):
 
 
 def main():
+    load_env()
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--input", default=str(ROOT / "examples/leads.csv"))
+    parser.add_argument("--source", choices=["csv", "apollo"], default="csv")
+    parser.add_argument("--input", help="CSV file; defaults to fictional examples for CSV mode")
+    parser.add_argument("--apollo-config", default=str(ROOT / "config/apollo.json"))
+    parser.add_argument("--enrich-organizations", action="store_true", help="Opt in to Apollo company enrichment; may consume credits, including in preview")
     parser.add_argument("--config", default=str(ROOT / "config/offer.json"))
     parser.add_argument("--output", default="output")
     parser.add_argument("--limit", type=int, default=10, help="Maximum rows, default 10")
@@ -177,18 +185,50 @@ def main():
     modes = parser.add_mutually_exclusive_group(required=True)
     modes.add_argument("--preview", action="store_true", help="Prepare requests without calling JEV")
     modes.add_argument("--live", action="store_true", help="Send selected fields to TypeSafe; uses API credits")
+    modes.add_argument("--doctor", action="store_true", help="Check local setup without API calls or printing secrets")
     args = parser.parse_args()
     if not 1 <= args.workers <= 16 or args.limit < 1:
         parser.error("Use workers 1 to 16 and a positive limit.")
     config = load_config(args.config)
-    leads = load_leads(args.input, args.limit)
+    apollo_config = json.loads(Path(args.apollo_config).read_text())
+    apollo.validate_config(apollo_config)
+    if args.doctor:
+        print("Offer and Apollo configuration: valid")
+        print("APOLLO_API_KEY: " + ("configured" if os.environ.get("APOLLO_API_KEY") else "missing (CSV still works)"))
+        print("TYPESAFE_API_KEY: " + ("configured" if os.environ.get("TYPESAFE_API_KEY") else "missing (preview still works)"))
+        print("Local check only. Provider access and account billing have not been tested.")
+        return 0
+    if args.source == "apollo" and args.input:
+        parser.error("Use --input with --source csv. Apollo mode reads saved contacts directly.")
+    if args.source != "apollo" and args.enrich_organizations:
+        parser.error("--enrich-organizations requires --source apollo.")
     key = os.environ.get("TYPESAFE_API_KEY", "")
     if args.live and not key:
         parser.error("Set TYPESAFE_API_KEY before using --live. See README.md.")
     out = Path(args.output)
+    if out.exists():
+        parser.error("Output directory exists. Choose a new name before any API calls.")
+    source_started = time.perf_counter()
+    if args.source == "apollo":
+        apollo_key = os.environ.get("APOLLO_API_KEY", "")
+        if not apollo_key:
+            parser.error("Set APOLLO_API_KEY using configure.py or use --source csv.")
+        leads, source_meta = apollo.fetch_leads(apollo_config, apollo_key, args.limit, args.enrich_organizations)
+        print(f"Imported {len(leads)} saved Apollo contacts. {source_meta['rows_missing_fit_context']} lack some fit fields.")
+    else:
+        leads = load_leads(args.input or ROOT / "examples/leads.csv", args.limit)
+        source_meta = {"source": "csv", "rows_imported": len(leads)}
+    source_meta["ingestion_seconds"] = round(time.perf_counter() - source_started, 3)
     # Keep separate runs, and never overwrite a previous result or source file.
     out.mkdir(parents=True, exist_ok=False)
     (out / "config-used.json").write_text(json.dumps(config, indent=2) + "\n")
+    (out / "source-summary.json").write_text(json.dumps(source_meta, indent=2) + "\n")
+    if args.source == "apollo":
+        (out / "apollo-config-used.json").write_text(json.dumps(apollo_config, indent=2) + "\n")
+        with (out / "imported-leads.csv").open("w", newline="", encoding="utf-8-sig") as f:
+            writer = csv.DictWriter(f, fieldnames=list(leads[0]))
+            writer.writeheader()
+            writer.writerows({k: csv_safe(v) for k, v in lead.items()} for lead in leads)
     bodies = [request_body(lead, config, args.model) for lead in leads]
     with (out / "requests.jsonl").open("w") as f:
         for lead, body in zip(leads, bodies):
@@ -218,7 +258,8 @@ def main():
             writer.writeheader()
             writer.writerows({k: csv_safe(v) for k, v in row.items()} for row, _ in results)
     summary = {
-        "mode": "live" if args.live else "preview_no_api_calls",
+        "mode": "live" if args.live else ("apollo_preview_no_jev_calls" if args.source == "apollo" else "preview_no_api_calls"),
+        "source": source_meta,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "input_rows": len(leads), "successful_rows": sum(not r["error"] for r, _ in results),
         "failed_rows": sum(bool(r["error"]) for r, _ in results),
