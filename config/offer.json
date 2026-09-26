@@ -1,0 +1,22 @@
+{
+  "offer": "We build AI-assisted operational automations for service businesses with 5 to 100 employees. Buyers are founders, owners and people responsible for operations. Available offers are enquiry follow-up, client onboarding and recurring reporting. A relevant role and business can establish basic customer fit. Recommending a specific automation requires supplied evidence of that workflow or problem.",
+  "review_threshold": 0.8,
+  "criteria": {
+    "fit": {
+      "good_fit": "Evidence establishes a service business with 5 to 100 employees and a founder, owner or operations decision-maker. No stated exclusion applies.",
+      "poor_fit": "An explicit fact contradicts the target: outside the company size range, not a service business, or a role unrelated to buying or managing operational services.",
+      "unknown": "Required facts are missing, contradictory or too vague to establish fit. Do not fill gaps from general knowledge."
+    },
+    "angle": {
+      "enquiry_follow_up": "Sourced and dated notes describe relevant enquiry volume, delayed replies or a documented enquiry handling workflow that could benefit from automation.",
+      "client_onboarding": "Sourced and dated notes describe repeated manual intake, document collection or new-client onboarding work.",
+      "reporting": "Sourced and dated notes describe repeated manual reporting or consolidating data between business tools.",
+      "unknown": "The supplied evidence does not support one specific offered workflow, or several are equally supported. A title, industry, headcount or software name alone is insufficient."
+    },
+    "message_check": {
+      "match": "The message addresses the actual role and business. Factual personalization is supported, and any proposed workflow is relevant to supplied evidence. Questions and conditional offers do not count as claims that a pain point exists.",
+      "mismatch": "The message targets the wrong role or business, offers an irrelevant workflow, or asserts an unsupported fact about the prospect's needs, tools, results or buying intent.",
+      "unknown": "The available information is too limited or conflicting to judge the message's relevance."
+    }
+  }
+}

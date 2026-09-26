@@ -1,0 +1,6 @@
+Apollo Contact Id,Title,Company Name,Industry,# Employees,Keywords,Technologies,Research Notes,Research Source,Research Date,Outreach Message
+sample-001,Founder,Example North Studio,Design services,12,client services,HubSpot,"Fictional example: their operations brief says a coordinator manually collects onboarding forms and files for each new client.",https://example.com/fictional-brief-1,2026-09-01,"Your brief mentions collecting onboarding forms manually. We build a workflow that collects the forms and tracks missing files. Would that be useful to look at?"
+sample-002,Head of Operations,Example Bay Agency,Marketing services,35,agency,Google Sheets,"Fictional example: their operations brief describes copying campaign metrics into a weekly client report.",https://example.com/fictional-brief-2,2026-09-01,"We help warehouse managers automate inventory replenishment. Your warehouse must be struggling to keep up."
+sample-003,Student,Example University,Higher education,2000,education,,,,,"We help service business owners automate new-client onboarding."
+sample-004,Founder,Example New Company,,,,,,,,
+sample-005,Owner,Example Field Services,Facilities services,22,commercial maintenance,HubSpot,,,,"Do you have any repetitive admin work around new enquiries that you would like to reduce?"
